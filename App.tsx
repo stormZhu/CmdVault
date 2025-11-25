@@ -61,10 +61,14 @@ export default function App() {
   }, [commands]);
 
   // Derived state
-  const categories = useMemo(() => {
+  const uniqueCategories = useMemo(() => {
     const cats = new Set(commands.map(c => c.category));
-    return ['All', ...Array.from(cats).sort()];
+    return Array.from(cats).sort();
   }, [commands]);
+
+  const categories = useMemo(() => {
+    return ['All', ...uniqueCategories];
+  }, [uniqueCategories]);
 
   const filteredCommands = useMemo(() => {
     return commands.filter(cmd => {
@@ -247,6 +251,7 @@ export default function App() {
         onClose={() => setIsEditorOpen(false)}
         onSave={handleSaveCommand}
         initialData={editingCommand}
+        availableCategories={uniqueCategories}
       />
       
       {/* Overlay for mobile sidebar */}

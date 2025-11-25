@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Save } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Sparkles, Loader2, Save, ChevronDown } from 'lucide-react';
 import { Command, CommandFormData } from '../types';
 import { generateCommandFromDescription } from '../services/geminiService';
 
@@ -8,6 +8,7 @@ interface CommandEditorProps {
   onClose: () => void;
   onSave: (data: CommandFormData) => void;
   initialData?: Command;
+  availableCategories?: string[];
 }
 
 const DEFAULT_FORM: CommandFormData = {
@@ -18,19 +19,46 @@ const DEFAULT_FORM: CommandFormData = {
   tags: []
 };
 
-export const CommandEditor: React.FC<CommandEditorProps> = ({ isOpen, onClose, onSave, initialData }) => {
+// Common default categories to seed the suggestion list
+const DEFAULT_CATEGORIES = ['Git', 'Docker', 'Kubernetes', 'System', 'Network', 'Database', 'Cloud'];
+
+export const CommandEditor: React.FC<CommandEditorProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  initialData, 
+  availableCategories = [] 
+}) => {
   const [formData, setFormData] = useState<CommandFormData>(DEFAULT_FORM);
   const [tagInput, setTagInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  
+  // Combobox state
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setFormData(initialData ? { ...initialData } : DEFAULT_FORM);
       setTagInput('');
       setAiPrompt('');
+      setShowCategoryDropdown(false);
     }
   }, [isOpen, initialData]);
+
+  // Handle clicks outside the combobox
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    if (showCategoryDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCategoryDropdown]);
 
   if (!isOpen) return null;
 
@@ -66,6 +94,14 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ isOpen, onClose, o
     onSave(formData);
     onClose();
   };
+
+  // Merge available categories with defaults and de-duplicate
+  const allSuggestions = Array.from(new Set([...availableCategories, ...DEFAULT_CATEGORIES])).sort();
+  
+  // Filter suggestions based on input
+  const filteredCategories = allSuggestions.filter(c => 
+    c.toLowerCase().includes(formData.category.toLowerCase())
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -137,23 +173,50 @@ export const CommandEditor: React.FC<CommandEditorProps> = ({ isOpen, onClose, o
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div ref={dropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">Category</label>
-                <input
-                  type="text"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={formData.category}
-                  onChange={e => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="General"
-                  list="categories"
-                />
-                <datalist id="categories">
-                  <option value="Git" />
-                  <option value="Docker" />
-                  <option value="Kubernetes" />
-                  <option value="System" />
-                  <option value="Network" />
-                </datalist>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.category}
+                    onChange={e => {
+                      setFormData({ ...formData, category: e.target.value });
+                      setShowCategoryDropdown(true);
+                    }}
+                    onFocus={() => setShowCategoryDropdown(true)}
+                    placeholder="e.g., Git"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
+                
+                {/* Custom Combobox Dropdown */}
+                {showCategoryDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                      {filteredCategories.length > 0 ? (
+                        filteredCategories.map(cat => (
+                          <div
+                            key={cat}
+                            className="px-3 py-2 text-sm text-slate-200 hover:bg-blue-600/20 hover:text-blue-400 cursor-pointer transition-colors"
+                            onClick={() => {
+                              setFormData({ ...formData, category: cat });
+                              setShowCategoryDropdown(false);
+                            }}
+                          >
+                            {cat}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-slate-500 italic">
+                          No matching categories (will create new)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
