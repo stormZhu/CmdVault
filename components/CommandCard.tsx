@@ -6,9 +6,10 @@ interface CommandCardProps {
   command: Command;
   onEdit: (command: Command) => void;
   onDelete: (id: string) => void;
+  onCopy?: (command: Command, filledCommand: string) => void;
 }
 
-export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
+export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDelete, onCopy }) => {
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -33,6 +34,12 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
     try {
       await navigator.clipboard.writeText(finalCommand);
       setCopied(true);
+      
+      // Analytics tracking
+      if (onCopy) {
+        onCopy(command, finalCommand);
+      }
+
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy', err);

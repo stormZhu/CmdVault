@@ -11,11 +11,13 @@ import {
   Sun,
   Moon,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  LayoutDashboard
 } from 'lucide-react';
-import { Command, CommandFormData } from './types';
+import { Command, CommandFormData, CopyLog } from './types';
 import { CommandCard } from './components/CommandCard';
 import { CommandEditor } from './components/CommandEditor';
+import { Dashboard } from './components/Dashboard';
 
 // --- MOCK DATA FOR FIRST LOAD ---
 const MOCK_COMMANDS: Command[] = [
@@ -49,6 +51,7 @@ const MOCK_COMMANDS: Command[] = [
 ];
 
 type Theme = 'light' | 'dark';
+type ViewMode = 'library' | 'dashboard';
 
 export default function App() {
   // --- THEME STATE ---
@@ -82,9 +85,17 @@ export default function App() {
     return saved ? JSON.parse(saved) : MOCK_COMMANDS;
   });
   
+  const [analyticsLogs, setAnalyticsLogs] = useState<CopyLog[]>(() => {
+    const saved = localStorage.getItem('cmdvault_analytics');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<Command | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Navigation State
+  const [currentView, setCurrentView] = useState<ViewMode>('library');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   
   // Sidebar State
@@ -101,6 +112,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('cmdvault_sidebar_collapsed', String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('cmdvault_analytics', JSON.stringify(analyticsLogs));
+  }, [analyticsLogs]);
 
   // Derived state
   const uniqueCategories = useMemo(() => {
@@ -143,6 +158,18 @@ export default function App() {
     setCommands(prev => prev.filter(c => c.id !== id));
   };
 
+  const handleTrackCopy = (command: Command, filledCommand: string) => {
+    const log: CopyLog = {
+      id: crypto.randomUUID(),
+      commandId: command.id,
+      title: command.title,
+      template: command.template,
+      filledCommand,
+      timestamp: Date.now()
+    };
+    setAnalyticsLogs(prev => [log, ...prev]);
+  };
+
   const openNewCommand = () => {
     setEditingCommand(undefined);
     setIsEditorOpen(true);
@@ -151,6 +178,17 @@ export default function App() {
   const openEditCommand = (cmd: Command) => {
     setEditingCommand(cmd);
     setIsEditorOpen(true);
+  };
+
+  const switchToDashboard = () => {
+    setCurrentView('dashboard');
+    setIsSidebarOpen(false);
+  };
+
+  const switchToLibrary = (category = 'All') => {
+    setCurrentView('library');
+    setSelectedCategory(category);
+    setIsSidebarOpen(false);
   };
 
   return (
@@ -221,41 +259,64 @@ export default function App() {
             {!isSidebarCollapsed && <span>New Command</span>}
           </button>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar -mx-2 px-2">
-            {!isSidebarCollapsed && (
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2 whitespace-nowrap">Categories</h3>
-            )}
+          <div className="flex-1 overflow-y-auto custom-scrollbar -mx-2 px-2 space-y-6">
             
-            <nav className="space-y-1">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    setIsSidebarOpen(false);
-                  }}
-                  title={isSidebarCollapsed ? cat : ""}
-                  className={`
-                    w-full flex items-center rounded-lg transition-colors
-                    ${isSidebarCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5 text-sm'}
-                    ${selectedCategory === cat 
-                      ? 'bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' 
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'}
-                  `}
-                >
-                  <div className={`flex items-center ${!isSidebarCollapsed && 'gap-3'}`}>
-                    {cat === 'All' ? <Hash size={isSidebarCollapsed ? 20 : 16} /> : <CommandIcon size={isSidebarCollapsed ? 20 : 16} />}
-                    {!isSidebarCollapsed && <span className="truncate">{cat}</span>}
-                  </div>
-                  
-                  {!isSidebarCollapsed && cat !== 'All' && (
-                     <span className="text-xs bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-500 font-medium ml-2">
-                       {commands.filter(c => c.category === cat).length}
-                     </span>
-                  )}
-                </button>
-              ))}
-            </nav>
+            {/* Main Navigation */}
+            <div>
+              {!isSidebarCollapsed && (
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2 whitespace-nowrap">Views</h3>
+              )}
+              <button
+                onClick={switchToDashboard}
+                title={isSidebarCollapsed ? "Dashboard" : ""}
+                className={`
+                  w-full flex items-center rounded-lg transition-colors
+                  ${isSidebarCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5 text-sm'}
+                  ${currentView === 'dashboard'
+                    ? 'bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'}
+                `}
+              >
+                <div className={`flex items-center ${!isSidebarCollapsed && 'gap-3'}`}>
+                  <LayoutDashboard size={isSidebarCollapsed ? 20 : 16} />
+                  {!isSidebarCollapsed && <span className="truncate">Dashboard</span>}
+                </div>
+              </button>
+            </div>
+
+            {/* Categories */}
+            <div>
+              {!isSidebarCollapsed && (
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2 whitespace-nowrap">Library</h3>
+              )}
+              <nav className="space-y-1">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => switchToLibrary(cat)}
+                    title={isSidebarCollapsed ? cat : ""}
+                    className={`
+                      w-full flex items-center rounded-lg transition-colors
+                      ${isSidebarCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5 text-sm'}
+                      ${currentView === 'library' && selectedCategory === cat 
+                        ? 'bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' 
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'}
+                    `}
+                  >
+                    <div className={`flex items-center ${!isSidebarCollapsed && 'gap-3'}`}>
+                      {cat === 'All' ? <Hash size={isSidebarCollapsed ? 20 : 16} /> : <CommandIcon size={isSidebarCollapsed ? 20 : 16} />}
+                      {!isSidebarCollapsed && <span className="truncate">{cat}</span>}
+                    </div>
+                    
+                    {!isSidebarCollapsed && cat !== 'All' && (
+                       <span className="text-xs bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-500 font-medium ml-2">
+                         {commands.filter(c => c.category === cat).length}
+                       </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
           </div>
           
           {/* Sidebar Footer */}
@@ -292,54 +353,67 @@ export default function App() {
         <header className="bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 transition-colors duration-300">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-              {selectedCategory === 'All' ? 'All Commands' : selectedCategory}
+              {currentView === 'dashboard' ? 'Analytics Dashboard' : (selectedCategory === 'All' ? 'All Commands' : selectedCategory)}
             </h1>
             <p className="text-slate-500 text-sm">
-              {filteredCommands.length} command{filteredCommands.length !== 1 && 's'} found
+              {currentView === 'dashboard' 
+                ? 'Track your most used commands and templates.'
+                : `${filteredCommands.length} command${filteredCommands.length !== 1 && 's'} found`
+              }
             </p>
           </div>
 
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
-            <input
-              type="text"
-              placeholder="Search commands, tags, descriptions..."
-              className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+          {currentView === 'library' && (
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
+              <input
+                type="text"
+                placeholder="Search commands, tags, descriptions..."
+                className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-200 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
         </header>
 
-        {/* Command Grid */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-          {filteredCommands.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
-              {filteredCommands.map(cmd => (
-                <CommandCard 
-                  key={cmd.id} 
-                  command={cmd} 
-                  onEdit={openEditCommand}
-                  onDelete={handleDeleteCommand}
-                />
-              ))}
-            </div>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          
+          {currentView === 'dashboard' ? (
+            <Dashboard logs={analyticsLogs} />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 pb-20">
-              <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-800">
-                <Filter size={32} className="opacity-50 text-slate-400 dark:text-slate-500" />
-              </div>
-              <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300">No commands found</h3>
-              <p className="max-w-xs text-center mt-2 text-slate-500 dark:text-slate-500">
-                Try adjusting your search terms or create a new command to get started.
-              </p>
-              <button 
-                onClick={openNewCommand}
-                className="mt-6 text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 font-medium flex items-center gap-2"
-              >
-                <Plus size={18} />
-                Create New Command
-              </button>
+            <div className="p-4 md:p-6 pb-20">
+              {filteredCommands.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {filteredCommands.map(cmd => (
+                    <CommandCard 
+                      key={cmd.id} 
+                      command={cmd} 
+                      onEdit={openEditCommand}
+                      onDelete={handleDeleteCommand}
+                      onCopy={handleTrackCopy}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 pt-20">
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-800">
+                    <Filter size={32} className="opacity-50 text-slate-400 dark:text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300">No commands found</h3>
+                  <p className="max-w-xs text-center mt-2 text-slate-500 dark:text-slate-500">
+                    Try adjusting your search terms or create a new command to get started.
+                  </p>
+                  <button 
+                    onClick={openNewCommand}
+                    className="mt-6 text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 font-medium flex items-center gap-2"
+                  >
+                    <Plus size={18} />
+                    Create New Command
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

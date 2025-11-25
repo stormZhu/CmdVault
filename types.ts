@@ -16,6 +16,15 @@ export interface Category {
   icon?: string;
 }
 
+export interface CopyLog {
+  id: string;
+  commandId: string;
+  template: string;
+  title: string;
+  filledCommand: string; // The actual command copied with variables replaced
+  timestamp: number;
+}
+
 // Helper to extract variables from a template string
 // e.g. "git commit -m {{message}}" -> ["message"]
 export const extractVariables = (template: string): string[] => {
