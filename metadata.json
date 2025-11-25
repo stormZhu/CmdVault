@@ -1,0 +1,5 @@
+{
+  "name": "Copy of CmdVault",
+  "description": "A smart command-line snippet manager that allows you to template, parameterize, and organize your frequently used shell commands.",
+  "requestFramePermissions": []
+}
