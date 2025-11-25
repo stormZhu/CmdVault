@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Copy, Edit, Trash2, Check, Terminal } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Copy, Edit, Trash2, Check } from 'lucide-react';
 import { Command, extractVariables, replaceVariables } from '../types';
 
 interface CommandCardProps {
@@ -15,7 +15,7 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
   // Extract placeholders from the template
   const placeholders = useMemo(() => extractVariables(command.template), [command.template]);
 
-  // Compute final command based on user input
+  // Compute final command based on user input for clipboard
   const finalCommand = useMemo(() => {
     return replaceVariables(command.template, variables);
   }, [command.template, variables]);
@@ -45,7 +45,7 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
               {command.category}
             </span>
           </div>
-          <p className="text-sm text-slate-400 line-clamp-2 h-10">{command.description}</p>
+          <p className="text-sm text-slate-400 line-clamp-2 min-h-[2.5rem]">{command.description}</p>
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button 
@@ -66,14 +66,14 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
       </div>
 
       {/* Code Display */}
-      <div className="bg-slate-950 p-4 relative group/code">
-        <div className="absolute top-2 right-2">
+      <div className="bg-slate-950 relative group/code">
+        <div className="absolute top-2 right-2 z-10">
           <button
             onClick={handleCopy}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               copied 
                 ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-                : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white'
+                : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white shadow-lg'
             }`}
           >
             {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -81,27 +81,29 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
           </button>
         </div>
         
-        <div className="font-mono text-sm text-blue-300 break-all pr-16 min-h-[48px] flex items-center">
-          <span className="text-slate-600 mr-2 select-none">$</span>
-          {finalCommand.split(/(\{\{.*?\}\})/).map((part, i) => {
+        <div className="font-mono text-sm break-all p-4 pt-5 pr-20 min-h-[80px] leading-relaxed">
+          <span className="text-slate-500 mr-2 select-none">$</span>
+          {command.template.split(/(\{\{.*?\}\})/).map((part, i) => {
             if (part.startsWith('{{') && part.endsWith('}}')) {
-               // This logic is for when variables are NOT filled yet in the raw view, 
-               // but replaceVariables handles the "visual" substitution. 
-               // We actually render the finalCommand in the view, so we don't see {{}} unless it's not replaced.
-               // However, replaceVariables keeps {{key}} if not found in map.
                const key = part.slice(2, -2).trim();
-               if (!variables[key]) {
-                 return <span key={i} className="text-yellow-500 font-bold bg-yellow-500/10 px-1 rounded mx-0.5">{part}</span>
+               const value = variables[key];
+               
+               if (value) {
+                 return (
+                   <span key={i} className="text-green-400 font-semibold border-b border-dotted border-green-400/50">
+                     {value}
+                   </span>
+                 );
                }
-               return <span key={i}>{variables[key]}</span>
+               
+               return (
+                 <span key={i} className="text-amber-400 bg-amber-400/10 px-1 rounded mx-0.5 border border-amber-400/20">
+                   {part}
+                 </span>
+               );
             }
-             // For the finalCommand string, replaceVariables returns the string with values.
-             // We just render the text. 
-             // To highlight inserted variables, we would need more complex diffing. 
-             // For simplicity, we just render the text.
-             return null;
+             return <span key={i} className="text-blue-300">{part}</span>;
           })}
-          {finalCommand}
         </div>
       </div>
 
