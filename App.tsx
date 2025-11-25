@@ -9,7 +9,9 @@ import {
   Hash,
   Filter,
   Sun,
-  Moon
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { Command, CommandFormData } from './types';
 import { CommandCard } from './components/CommandCard';
@@ -84,11 +86,21 @@ export default function App() {
   const [editingCommand, setEditingCommand] = useState<Command | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile drawer
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => { // Desktop collapsible
+    const saved = localStorage.getItem('cmdvault_sidebar_collapsed');
+    return saved === 'true';
+  });
 
   useEffect(() => {
     localStorage.setItem('cmdvault_commands', JSON.stringify(commands));
   }, [commands]);
+
+  useEffect(() => {
+    localStorage.setItem('cmdvault_sidebar_collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   // Derived state
   const uniqueCategories = useMemo(() => {
@@ -165,26 +177,55 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-200 ease-in-out
-        md:relative md:translate-x-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed inset-y-0 left-0 z-30 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-all duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
+        md:relative md:translate-x-0 
+        ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
       `}>
-        <div className="p-6 h-full flex flex-col">
-          <div className="hidden md:flex items-center gap-2 text-blue-600 dark:text-blue-500 font-bold text-2xl mb-8">
-            <Terminal size={28} />
-            <span>CmdVault</span>
+        <div className="h-full flex flex-col p-4">
+          
+          {/* Sidebar Header */}
+          <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} mb-8 h-10`}>
+            {(!isSidebarCollapsed) && (
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-500 font-bold text-2xl overflow-hidden whitespace-nowrap animate-in fade-in duration-300">
+                <Terminal size={28} className="shrink-0" />
+                <span>CmdVault</span>
+              </div>
+            )}
+            {/* Logo when collapsed */}
+            {isSidebarCollapsed && (
+              <div className="text-blue-600 dark:text-blue-500">
+                <Terminal size={28} />
+              </div>
+            )}
+            
+            {/* Desktop Collapse Toggle */}
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden md:block text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            </button>
           </div>
 
           <button 
             onClick={openNewCommand}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20 dark:shadow-blue-900/20 mb-6"
+            title={isSidebarCollapsed ? "New Command" : ""}
+            className={`
+              bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-500/20 dark:shadow-blue-900/20 mb-6 flex items-center
+              ${isSidebarCollapsed ? 'p-3 justify-center mx-auto' : 'py-3 px-4 justify-center gap-2 w-full'}
+            `}
           >
             <Plus size={20} />
-            New Command
+            {!isSidebarCollapsed && <span>New Command</span>}
           </button>
 
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Categories</h3>
+          <div className="flex-1 overflow-y-auto custom-scrollbar -mx-2 px-2">
+            {!isSidebarCollapsed && (
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2 whitespace-nowrap">Categories</h3>
+            )}
+            
             <nav className="space-y-1">
               {categories.map(cat => (
                 <button
@@ -193,18 +234,22 @@ export default function App() {
                     setSelectedCategory(cat);
                     setIsSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                    selectedCategory === cat 
+                  title={isSidebarCollapsed ? cat : ""}
+                  className={`
+                    w-full flex items-center rounded-lg transition-colors
+                    ${isSidebarCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5 text-sm'}
+                    ${selectedCategory === cat 
                       ? 'bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' 
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'}
+                  `}
                 >
-                  <div className="flex items-center gap-3">
-                    {cat === 'All' ? <Hash size={16} /> : <CommandIcon size={16} />}
-                    <span>{cat}</span>
+                  <div className={`flex items-center ${!isSidebarCollapsed && 'gap-3'}`}>
+                    {cat === 'All' ? <Hash size={isSidebarCollapsed ? 20 : 16} /> : <CommandIcon size={isSidebarCollapsed ? 20 : 16} />}
+                    {!isSidebarCollapsed && <span className="truncate">{cat}</span>}
                   </div>
-                  {cat !== 'All' && (
-                     <span className="text-xs bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-500 font-medium">
+                  
+                  {!isSidebarCollapsed && cat !== 'All' && (
+                     <span className="text-xs bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-500 font-medium ml-2">
                        {commands.filter(c => c.category === cat).length}
                      </span>
                   )}
@@ -214,18 +259,28 @@ export default function App() {
           </div>
           
           {/* Sidebar Footer */}
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-auto flex items-center justify-between">
-            <a href="#" className="flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors text-sm px-2">
-              <Github size={18} />
-              <span>GitHub</span>
+          <div className={`
+            pt-4 border-t border-slate-200 dark:border-slate-800 mt-auto flex items-center 
+            ${isSidebarCollapsed ? 'justify-center flex-col gap-4' : 'justify-between'}
+          `}>
+            <a 
+              href="#" 
+              title="GitHub"
+              className={`flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors text-sm ${!isSidebarCollapsed && 'gap-2 px-2'}`}
+            >
+              <Github size={isSidebarCollapsed ? 20 : 18} />
+              {!isSidebarCollapsed && <span>GitHub</span>}
             </a>
             
             <button 
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+              className={`
+                rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white transition-colors
+                ${isSidebarCollapsed ? 'p-2' : 'p-2'}
+              `}
               title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              {theme === 'dark' ? <Sun size={isSidebarCollapsed ? 20 : 18} /> : <Moon size={isSidebarCollapsed ? 20 : 18} />}
             </button>
           </div>
         </div>
