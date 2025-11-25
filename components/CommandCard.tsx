@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Copy, Edit, Trash2, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Copy, Edit, Trash2, Check, X } from 'lucide-react';
 import { Command, extractVariables, replaceVariables } from '../types';
 
 interface CommandCardProps {
@@ -11,6 +11,7 @@ interface CommandCardProps {
 export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Extract placeholders from the template
   const placeholders = useMemo(() => extractVariables(command.template), [command.template]);
@@ -19,6 +20,14 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
   const finalCommand = useMemo(() => {
     return replaceVariables(command.template, variables);
   }, [command.template, variables]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isDeleting) {
+      timer = setTimeout(() => setIsDeleting(false), 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [isDeleting]);
 
   const handleCopy = async () => {
     try {
@@ -34,6 +43,20 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
     setVariables(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isDeleting) {
+      onDelete(command.id);
+    } else {
+      setIsDeleting(true);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(command);
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-600 transition-all duration-300 flex flex-col shadow-sm group">
       {/* Card Header */}
@@ -45,43 +68,37 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
               {command.category}
             </span>
           </div>
-          <p className="text-sm text-slate-400 line-clamp-2 min-h-[2.5rem]">{command.description}</p>
+          <p className="text-sm text-slate-400 line-clamp-2 min-h-[1.25rem]">{command.description}</p>
         </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity items-center">
+          {!isDeleting && (
+            <button 
+              onClick={handleEditClick} 
+              className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition-colors"
+              title="Edit"
+            >
+              <Edit size={16} />
+            </button>
+          )}
           <button 
-            onClick={() => onEdit(command)} 
-            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded"
-            title="Edit"
+            onClick={handleDeleteClick} 
+            className={`flex items-center gap-1.5 p-1.5 rounded transition-all duration-200 ${
+              isDeleting 
+                ? 'bg-red-500/10 text-red-500 pr-2 pl-1.5 ring-1 ring-red-500/50' 
+                : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'
+            }`}
+            title={isDeleting ? "Confirm Delete" : "Delete"}
           >
-            <Edit size={16} />
-          </button>
-          <button 
-            onClick={() => onDelete(command.id)} 
-            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded"
-            title="Delete"
-          >
-            <Trash2 size={16} />
+            {isDeleting ? <Trash2 size={14} className="animate-pulse" /> : <Trash2 size={16} />}
+            {isDeleting && <span className="text-xs font-bold">Confirm?</span>}
           </button>
         </div>
       </div>
 
       {/* Code Display */}
-      <div className="bg-slate-950 relative group/code">
-        <div className="absolute top-2 right-2 z-10">
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              copied 
-                ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-                : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white shadow-lg'
-            }`}
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
+      <div className="bg-slate-950 flex p-4 items-start gap-3 group/code">
         
-        <div className="font-mono text-sm break-all p-4 pt-5 pr-20 min-h-[80px] leading-relaxed">
+        <div className="font-mono text-sm break-all leading-relaxed flex-1 pt-1">
           <span className="text-slate-500 mr-2 select-none">$</span>
           {command.template.split(/(\{\{.*?\}\})/).map((part, i) => {
             if (part.startsWith('{{') && part.endsWith('}}')) {
@@ -97,7 +114,7 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
                }
                
                return (
-                 <span key={i} className="text-amber-400 bg-amber-400/10 px-1 rounded mx-0.5 border border-amber-400/20">
+                 <span key={i} className="text-amber-400 bg-amber-400/10 px-1 rounded mx-0.5 border border-amber-400/20 transition-colors">
                    {part}
                  </span>
                );
@@ -105,6 +122,19 @@ export const CommandCard: React.FC<CommandCardProps> = ({ command, onEdit, onDel
              return <span key={i} className="text-blue-300">{part}</span>;
           })}
         </div>
+
+        <button
+          onClick={handleCopy}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all select-none ${
+            copied 
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600'
+          }`}
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+
       </div>
 
       {/* Variable Inputs */}

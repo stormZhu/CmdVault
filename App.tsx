@@ -94,9 +94,9 @@ export default function App() {
   };
 
   const handleDeleteCommand = (id: string) => {
-    if (confirm('Are you sure you want to delete this command?')) {
-      setCommands(prev => prev.filter(c => c.id !== id));
-    }
+    // Confirmation is now handled in the UI component (CommandCard)
+    // so we can delete immediately here.
+    setCommands(prev => prev.filter(c => c.id !== id));
   };
 
   const openNewCommand = () => {
